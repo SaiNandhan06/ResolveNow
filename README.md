@@ -177,7 +177,6 @@ Full detail: see [`FEATURES_ROADMAP.md`](./FEATURES_ROADMAP.md).
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) — full system design, database schema, security model
 - [`FEATURES_ROADMAP.md`](./FEATURES_ROADMAP.md) — planned features and why they matter
 - [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md) — full project state for a developer or AI agent picking up this codebase
-- [`GIT_COMMIT_PLAN_GRANULAR.md`](./GIT_COMMIT_PLAN_GRANULAR.md) — commit history structure used to build this repo
 
 ## License
 Add your preferred license here (e.g. MIT) before making the repository public.
