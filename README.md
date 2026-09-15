@@ -49,26 +49,26 @@ ResolveNow was built to solve this for a service-desk operator that needed to:
 
 ```
                          ┌─────────────────────┐
-                         │   Eureka Server      │  service registry, :9000
-                         └──────────┬───────────┘
+                         │   Eureka Server     │  service registry, :9000
+                         └──────────┬──────────┘
                        register/heartbeat
         ┌───────────────────────────┼──────────────────────────────┐
         │                           │                              │
 ┌───────▼───────┐   ┌──────────────▼─────────┐   ┌─────────────────▼──────────┐
-│  authService   │   │   complaintService       │   │   assignmentService          │
-│  :8081         │   │   :8082                  │   │   :8083                     │
+│  authService  │   │   complaintService     │   │   assignmentService        │
+│  :8081        │   │   :8082                │   │   :8083                    │
 └───────┬───────┘   └──────────────┬─────────┘   └─────────────────┬──────────┘
         │                          │  Feign: triggerAssignment()   │
-        │                          └───────────────┬────────────────┘
-        │                                            │ Feign: updateStatus() / create()
+        │                          └───────────────┬───────────────┘
+        │                                          │ Feign: updateStatus() / create()
         │                              ┌─────────────▼──────────────┐
-        │                              │   notificationService       │
-        │                              │   :8084                     │
-        │                              └─────────────────────────────┘
+        │                              │   notificationService      │
+        │                              │   :8084                    │
+        │                              └────────────────────────────┘
         │
 ┌───────▼───────────────────────────────────────────────────────────────────┐
-│              apiGateway (Spring Cloud Gateway Server WebMVC) :9080         │
-│   - JwtAuthFilter validates the token, forwards X-User-Id/X-User-Role      │
+│              apiGateway (Spring Cloud Gateway Server WebMVC) :9080        │
+│   - JwtAuthFilter validates the token, forwards X-User-Id/X-User-Role     │
 │   - Routes /api/auth/**, /api/complaints/**, /api/assignments/**,         │
 │     /api/notifications/** to the matching service via lb://<name>         │
 └───────────────────────────────────────────────────────────────────────────┘
