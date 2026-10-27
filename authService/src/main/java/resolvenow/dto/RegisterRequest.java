@@ -13,4 +13,8 @@ public class RegisterRequest {
 
     @NotBlank @Size(min = 8)
     private String password;
+
+    // Optional: "AGENT" callers supply these; absent => defaults to CUSTOMER with no department
+    private String role;
+    private String department;
 }

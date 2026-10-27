@@ -21,9 +21,22 @@ public class Complaint {
 
     private String category;
 
+    /** AUTO-INFERRED from category at creation: HIGH / MEDIUM / LOW */
+    @Builder.Default
+    private String priority = "MEDIUM";
+
     @Builder.Default
     private String status = "OPEN";
 
+    /** SLA deadline — set at creation based on priority */
+    private LocalDateTime slaDueAt;
+
+    /** How many times this ticket has been escalated */
+    @Builder.Default
+    private int escalationCount = 0;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    private LocalDateTime updatedAt;
 }

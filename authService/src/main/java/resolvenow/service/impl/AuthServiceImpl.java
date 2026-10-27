@@ -30,11 +30,17 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Username already taken");
         }
 
+        // Determine role: only "AGENT" is accepted as an override; everything else defaults to CUSTOMER
+        String role = "AGENT".equalsIgnoreCase(request.getRole()) ? "AGENT" : "CUSTOMER";
+        // Agents must supply a department; customers leave it null
+        String department = "AGENT".equals(role) ? request.getDepartment() : null;
+
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role("CUSTOMER")
+                .role(role)
+                .department(department)
                 .enabled(true)
                 .build();
 
@@ -56,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse issueTokens(User user) {
-        String accessToken = jwtUtil.generateAccessToken(user.getUserId(), user.getRole());
+        String accessToken = jwtUtil.generateAccessToken(user.getUserId(), user.getRole(), user.getDepartment());
         String refreshTokenValue = jwtUtil.generateRefreshToken();
 
         RefreshToken refreshToken = RefreshToken.builder()
@@ -71,6 +77,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshTokenValue)
                 .role(user.getRole())
                 .userId(user.getUserId())
+                .department(user.getDepartment())
                 .build();
     }
 }

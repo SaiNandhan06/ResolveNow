@@ -12,6 +12,10 @@ public class ComplaintResponse {
     private String title;
     private String description;
     private String category;
+    private String priority;
     private String status;
+    private int escalationCount;
+    private LocalDateTime slaDueAt;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

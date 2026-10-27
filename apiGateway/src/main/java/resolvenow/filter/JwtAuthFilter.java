@@ -18,7 +18,11 @@ public class JwtAuthFilter implements Filter {
     @Value("${jwt.secret}")
     private String secret;
 
-    private static final String[] PUBLIC_PATHS = {"/api/auth/register", "/api/auth/login"};
+    private static final String[] PUBLIC_PATHS = {
+        "/api/auth/register",
+        "/api/auth/login",
+        "/api/auth/internal"   // Feign-internal endpoint, no user token available
+    };
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
@@ -50,6 +54,7 @@ public class JwtAuthFilter implements Filter {
             HeaderMapRequestWrapper wrappedRequest = new HeaderMapRequestWrapper(request);
             wrappedRequest.addHeader("X-User-Id", claims.getSubject());
             wrappedRequest.addHeader("X-User-Role", claims.get("role", String.class));
+            wrappedRequest.addHeader("X-User-Department", claims.get("department", String.class));
 
             chain.doFilter(wrappedRequest, res);
             return;

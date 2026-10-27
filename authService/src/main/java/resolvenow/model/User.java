@@ -24,7 +24,7 @@ public class User {
     @Builder.Default
     private String role = "CUSTOMER";
 
-    private Long departmentId;
+    private String department;
 
     @Builder.Default
     private boolean enabled = true;

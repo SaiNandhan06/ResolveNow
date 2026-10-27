@@ -27,7 +27,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public List<Notification> getByUser(Long userId) {
-        return notificationRepository.findByUserId(userId);
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
     @Override
@@ -36,5 +36,12 @@ public class NotificationServiceImpl implements NotificationService {
                 .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + notificationId));
         notification.setRead(true);
         notificationRepository.save(notification);
+    }
+
+    @Override
+    public void markAllRead(Long userId) {
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(userId);
+        unread.forEach(n -> n.setRead(true));
+        notificationRepository.saveAll(unread);
     }
 }

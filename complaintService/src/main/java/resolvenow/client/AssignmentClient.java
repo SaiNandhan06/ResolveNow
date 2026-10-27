@@ -4,7 +4,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "assignmentService")
+@FeignClient(name = "assignmentService", contextId = "assignmentTriggerClient")
 public interface AssignmentClient {
 
     @PostMapping("/api/assignments")
