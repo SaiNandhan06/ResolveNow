@@ -6,33 +6,33 @@ ResolveNow decouples complaint intake, department assignment, and user notificat
 ## 2. Component diagram
 ```
                          ┌─────────────────────┐
-                         │   Eureka Server      │  registry, :9000
-                         └──────────┬───────────┘
+                         │   Eureka Server     │  registry, :9000
+                         └──────────┬──────────┘
                        register/heartbeat
         ┌───────────────────────────┼──────────────────────────────┐
         │                           │                              │
 ┌───────▼───────┐   ┌──────────────▼─────────┐   ┌─────────────────▼──────────┐
-│  authService   │   │   complaintService       │   │   assignmentService          │
-│  :8081         │   │   :8082                  │   │   :8083                     │
+│  authService  │   │   complaintService     │   │   assignmentService        │
+│  :8081        │   │   :8082                │   │   :8083                    │
 └───────┬───────┘   └──────────────┬─────────┘   └─────────────────┬──────────┘
         │                          │  Feign: triggerAssignment()   │
-        │                          └───────────────┬────────────────┘
-        │                                            │ Feign: updateStatus() / create()
+        │                          └───────────────┬───────────────┘
+        │                                          │ Feign: updateStatus() / create()
         │                              ┌─────────────▼──────────────┐
-        │                              │   notificationService       │
-        │                              │   :8084                     │
-        │                              └─────────────────────────────┘
+        │                              │   notificationService      │
+        │                              │   :8084                    │
+        │                              └────────────────────────────┘
         │
 ┌───────▼───────────────────────────────────────────────────────────────────┐
-│                     apiGateway (Spring Cloud Gateway Server WebMVC) :9080  │
-│   - JwtAuthFilter validates the token, wraps the request to add            │
+│                     apiGateway (Spring Cloud Gateway Server WebMVC) :9080 │
+│   - JwtAuthFilter validates the token, wraps the request to add           │
 │     X-User-Id / X-User-Role headers before forwarding                     │
 │   - Routes /api/auth/**, /api/complaints/**, /api/assignments/**,         │
 │     /api/notifications/** to the matching service via lb://<name>         │
 └───────────────────────────────────────────────────────────────────────────┘
                                     ▲
                               ┌─────┴─────┐
-                              │  Clients   │ (Postman / browser REST client)
+                              │  Clients  │ (Postman / browser REST client)
                               └───────────┘
 ```
 

@@ -4,4 +4,4 @@ target/
 .settings/
 *.log
 .env
-/.metadata/
+.metadata/
