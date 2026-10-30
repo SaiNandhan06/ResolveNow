@@ -8,7 +8,7 @@ Read this file first, before touching any code. It's the single source of truth 
 
 ResolveNow is an automated ticket/complaint resolution platform built as six independent Spring Boot microservices. See `README.md` for the full problem statement and feature list, `ARCHITECTURE.md` for the system design and database schema.
 
-**Current status: MVP complete and manually verified end-to-end.** Automated tests, load balancing, event-driven messaging, and everything else in `FEATURES_ROADMAP.md` is **not yet built** — do not assume any of it exists.
+**Current status: lifecycle MVP implemented with automated unit/context tests and Docker Compose deployment.** Event-driven messaging, distributed tracing, and CI/CD remain future work.
 
 ---
 
@@ -89,7 +89,7 @@ A plain servlet `Filter` (`JwtAuthFilter` in `apiGateway`) can read incoming hea
 - **JWT is hand-rolled (`jjwt`), not a full Spring Authorization Server.** This was a deliberate MVP-speed tradeoff. Auth Service issues a token, the Gateway validates it with the same shared secret (`JWT_SECRET` env var). Upgrading to a real OAuth2 Authorization Server + JWKS-based resource servers is a valid future step, but is a meaningfully bigger change (see `FEATURES_ROADMAP.md`) — don't do it incidentally while fixing something else.
 - **Department assignment is a hardcoded `Map<String,String>`** in `AssignmentServiceImpl` (category → department), not a `Department` database entity. Promote it to a real entity only when dynamic department management is actually needed.
 - **Inter-service calls are synchronous Feign, not Kafka/RabbitMQ.** Complaint Service blocks on Assignment Service being reachable. This is intentional for the MVP; the event-driven rework is a planned, larger phase (see roadmap), not a quick fix.
-- **No global exception handling yet.** Errors currently surface as generic 500s from unhandled `IllegalArgumentException`. Adding a `@ControllerAdvice`/`GlobalExceptionHandler` per service is reasonable to do anytime, low-risk.
+- **Each business service now has a `@RestControllerAdvice`** that maps validation, authorization, missing records, downstream Feign failures, and unexpected errors to structured responses.
 - **The `createComplaint()` response shows `status: "OPEN"`, not `"ASSIGNED"`,** even though the DB row is updated to `ASSIGNED` almost immediately after, because the response is built from the in-memory object captured before the Feign call's side effects land. A subsequent `GET` shows the correct status. This is a known, accepted quirk, not a bug to silently patch unless asked.
 
 ---
@@ -101,7 +101,7 @@ Startup order matters (each depends on the previous being Eureka-registered):
 eurekaServer (9000) → authService (8081) → complaintService (8082) →
 assignmentService (8083) → notificationService (8084) → apiGateway (9080)
 ```
-All external traffic goes through `http://localhost:9080`. See `README.md`'s API reference table for every endpoint, and the earlier conversation history / `GIT_COMMIT_PLAN_GRANULAR.md` for a full sample request/response walkthrough (register → login → create complaint → check assignment → check notification).
+All external traffic goes through `http://localhost:9080`. Run `mvn test` for the automated suite, or use `docker compose up --build` after setting `JWT_SECRET` and `INTERNAL_SERVICE_TOKEN`. See `README.md` and `CURRENT_FLOW.md` for the lifecycle endpoints.
 
 Required environment variables: `JWT_SECRET` (shared identically between `authService` and `apiGateway`), `DB_PASSWORD` (defaults to `postgres` if unset).
 

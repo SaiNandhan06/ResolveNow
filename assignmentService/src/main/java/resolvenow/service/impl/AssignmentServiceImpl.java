@@ -116,6 +116,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     public void accept(Long assignmentId, Long agentId) {
         Assignment assignment = findAssignmentOrThrow(assignmentId);
         validateOwner(assignment, agentId);
+        if (!"ASSIGNED".equals(assignment.getStatus())) {
+            throw new IllegalArgumentException("Only assigned tickets can be accepted");
+        }
 
         assignment.setStatus("IN_PROGRESS");
         assignmentRepository.save(assignment);
@@ -130,6 +133,9 @@ public class AssignmentServiceImpl implements AssignmentService {
     public void resolve(Long assignmentId, Long agentId) {
         Assignment assignment = findAssignmentOrThrow(assignmentId);
         validateOwner(assignment, agentId);
+        if (!"IN_PROGRESS".equals(assignment.getStatus())) {
+            throw new IllegalArgumentException("Only in-progress tickets can be resolved");
+        }
 
         assignment.setStatus("RESOLVED");
         assignment.setClosedAt(LocalDateTime.now());
@@ -157,6 +163,16 @@ public class AssignmentServiceImpl implements AssignmentService {
     public Assignment getByComplaintId(Long complaintId) {
         return assignmentRepository.findTopByComplaintIdOrderByAssignedAtDesc(complaintId)
                 .orElseThrow(() -> new IllegalArgumentException("No assignment for complaint: " + complaintId));
+    }
+
+    @Override
+    public Assignment getByComplaintIdForCustomer(Long complaintId, Long customerId) {
+        Assignment assignment = getByComplaintId(complaintId);
+        if (!customerId.equals(assignment.getCustomerId())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Assignment belongs to another customer");
+        }
+        return assignment;
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
@@ -16,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class JwtAuthFilter implements Filter {
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthFilter.class);
 
     @Value("${jwt.secret}")
     private String secret;
@@ -58,14 +61,23 @@ public class JwtAuthFilter implements Filter {
                 return;
             }
             HeaderMapRequestWrapper wrappedRequest = new HeaderMapRequestWrapper(request);
+            wrappedRequest.suppressHeader("X-Internal-Token");
+            wrappedRequest.suppressHeader("X-User-Id");
+            wrappedRequest.suppressHeader("X-User-Role");
+            wrappedRequest.suppressHeader("X-User-Department");
+            String role = claims.get("role", String.class);
+            log.debug("Verified JWT user={} rolePresent={}", claims.getSubject(), role != null);
             wrappedRequest.addHeader("X-User-Id", claims.getSubject());
-            wrappedRequest.addHeader("X-User-Role", claims.get("role", String.class));
-            wrappedRequest.addHeader("X-User-Department", claims.get("department", String.class));
+            wrappedRequest.addHeader("X-User-Role", role == null ? "" : role);
+            log.debug("Forwarding identity headers userPresent={} rolePresent={}",
+                    wrappedRequest.getHeader("X-User-Id") != null,
+                    wrappedRequest.getHeader("X-User-Role") != null);
 
             chain.doFilter(wrappedRequest, res);
             return;
 
         } catch (Exception e) {
+            log.warn("Rejected JWT for {}", path, e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }

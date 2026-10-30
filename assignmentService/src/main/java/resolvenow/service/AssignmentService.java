@@ -7,6 +7,7 @@ import java.util.List;
 public interface AssignmentService {
     void autoAssign(Long complaintId, String category, Long userId);
     Assignment getByComplaintId(Long complaintId);
+    Assignment getByComplaintIdForCustomer(Long complaintId, Long customerId);
     void escalate(Long complaintId, Long requestedByUserId);
     List<Assignment> getMyActiveTickets(Long agentId);
     List<Assignment> getMyHistory(Long agentId);

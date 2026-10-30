@@ -30,17 +30,12 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Username already taken");
         }
 
-        // Determine role: only "AGENT" is accepted as an override; everything else defaults to CUSTOMER
-        String role = "AGENT".equalsIgnoreCase(request.getRole()) ? "AGENT" : "CUSTOMER";
-        // Agents must supply a department; customers leave it null
-        String department = "AGENT".equals(role) ? request.getDepartment() : null;
-
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(role)
-                .department(department)
+                .role("CUSTOMER")
+                .department(null)
                 .enabled(true)
                 .build();
 
@@ -53,6 +48,10 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid username or password"));
+
+        if (!user.isEnabled()) {
+            throw new IllegalArgumentException("User account is disabled");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Invalid username or password");

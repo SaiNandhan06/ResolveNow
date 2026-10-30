@@ -6,6 +6,6 @@ import java.util.List;
 public interface NotificationService {
     void create(Long userId, Long complaintId, String message);
     List<Notification> getByUser(Long userId);
-    void markRead(Long notificationId);
+    void markRead(Long notificationId, Long userId);
     void markAllRead(Long userId);
 }

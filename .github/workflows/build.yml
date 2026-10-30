@@ -1,0 +1,38 @@
+name: ResolveNow build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests
+        run: mvn --batch-mode test
+
+      - name: Package services
+        run: mvn --batch-mode -DskipTests package
+
+      - name: Validate Compose configuration
+        env:
+          JWT_SECRET: ci-only-secret-not-used-for-production
+          INTERNAL_SERVICE_TOKEN: ci-only-internal-token
+        run: docker compose config
+
+      - name: Build Docker images
+        env:
+          JWT_SECRET: ci-only-secret-not-used-for-production
+          INTERNAL_SERVICE_TOKEN: ci-only-internal-token
+        run: docker compose build

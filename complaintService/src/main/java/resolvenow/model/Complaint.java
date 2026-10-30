@@ -39,4 +39,9 @@ public class Complaint {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt;
+
+    private String resolutionNotes;
+    private Long resolvedBy;
+    private LocalDateTime resolvedAt;
+    private LocalDateTime closedAt;
 }

@@ -121,8 +121,10 @@ No cross-service foreign keys — services reference each other only by ID, reso
 - Every business service registers with `eurekaServer` (`eureka.client.serviceUrl.defaultZone=http://localhost:9000/eureka`).
 - `apiGateway` routes by path prefix to `lb://<serviceName>`, letting Eureka + Spring Cloud LoadBalancer resolve and balance across instances — this is the mechanism a later phase exercises with multiple `complaintService` instances.
 
-## 7. Known simplifications (intentional, for MVP)
+## 7. Current boundaries and planned improvements
 - Department is a hardcoded category → department string map in `AssignmentServiceImpl`, not a separate `Department` table — promote to an entity when dynamic department management is needed.
 - Inter-service communication is synchronous (Feign), not event-driven (Kafka/RabbitMQ) — planned for a later phase.
-- No centralized exception handling (`@ControllerAdvice`) yet — errors currently surface as generic 500s from unhandled `IllegalArgumentException`s.
-- No rate limiting or circuit breakers yet — planned alongside multi-instance load balancing.
+- Each business service has centralized `@RestControllerAdvice` error mapping for validation, authorization,
+  missing records, downstream failures, and unexpected errors.
+- Feign fallbacks log downstream failures. Durable retries/outbox reconciliation remain future work.
+- Gateway rate limiting and distributed tracing remain future improvements.

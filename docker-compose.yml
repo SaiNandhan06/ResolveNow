@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data-v18:/var/lib/postgresql
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  eurekaServer:
+    build: ./eurekaServer
+    image: resolvenow-eurekaserver
+    ports:
+      - "9000:9000"
+
+  authService:
+    build: ./authService
+    image: resolvenow-authservice
+    environment:
+      DB_PASSWORD: password
+      DB_HOST: postgres
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    depends_on:
+      - postgres
+      - eurekaServer
+
+  complaintService:
+    build: ./complaintService
+    image: resolvenow-complaintservice
+    environment:
+      DB_PASSWORD: password
+      DB_HOST: postgres
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    depends_on:
+      - postgres
+      - eurekaServer
+
+  complaintService2:
+    build: ./complaintService
+    image: resolvenow-complaintservice2
+    environment:
+      SERVER_PORT: 8085
+      DB_PASSWORD: password
+      DB_HOST: postgres
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    depends_on:
+      - postgres
+      - eurekaServer
+
+  assignmentService:
+    build: ./assignmentService
+    image: resolvenow-assignmentservice
+    environment:
+      DB_PASSWORD: password
+      DB_HOST: postgres
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    depends_on:
+      - postgres
+      - eurekaServer
+
+  notificationService:
+    build: ./notificationService
+    image: resolvenow-notificationservice
+    environment:
+      DB_PASSWORD: password
+      DB_HOST: postgres
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    depends_on:
+      - postgres
+      - eurekaServer
+
+  apiGateway:
+    build: ./apiGateway
+    image: resolvenow-apigateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET before starting}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?Set INTERNAL_SERVICE_TOKEN before starting}
+      EUREKA_URL: http://eurekaServer:9000/eureka
+    ports:
+      - "9080:9080"
+    depends_on:
+      - eurekaServer
+      - authService
+      - complaintService
+      - assignmentService
+      - notificationService
+
+volumes:
+  postgres-data-v18:

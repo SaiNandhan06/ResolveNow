@@ -1,13 +1,14 @@
 # ResolveNow — Features Roadmap
 
-Everything below is **not yet built**. This is the backlog, ordered by dependency (some items need earlier ones in place first), with why each matters and roughly where it plugs into the existing architecture.
+The core lifecycle, role/ownership security, structured error handling, H2-backed tests, and Docker Compose deployment are implemented. The items below are the remaining backlog, ordered by dependency.
 
 ---
 
-## Immediate next — testing
+## Completed foundation
 
 ### Automated test suite
-- **What:** `@WebMvcTest` per controller, `@DataJpaTest` per repository, one `@SpringBootTest` happy-path per service, WireMock stubs for Feign calls between Complaint/Assignment/Notification.
+- **Status:** Service context tests, H2 persistence coverage, focused lifecycle tests, controller authorization tests,
+  and repository tests are implemented. WireMock Feign integration tests remain optional.
 - **Why now:** the codebase is still small enough to backfill tests cheaply; every feature below this line gets riskier to add without a safety net.
 - **Where:** `src/test/java/resolvenow/...` in each service, mirroring the main package structure.
 
@@ -16,17 +17,21 @@ Everything below is **not yet built**. This is the backlog, ordered by dependenc
 ## Phase — scaling & resilience
 
 ### Multi-instance load balancing
-- **What:** run a second instance of `complaintService` (e.g. port 8085) and confirm Eureka + the Gateway's `lb://` resolves and round-robins between both.
+- **Status:** Docker Compose starts and registers a second `complaintService` instance on port 8085 with the same
+  application name. Runtime Eureka registration and end-to-end routing have been verified; repeatable round-robin
+  assertions remain optional.
 - **Why:** proves the "high-volume support surge" resilience requirement from the original spec — currently unverified since every service only ever runs as a single instance.
 - **Where:** no new code — just run a second instance with a different `server.port`, same `spring.application.name`.
 
 ### Gateway rate limiting
-- **What:** cap requests per user/IP at the Gateway (Spring Cloud Gateway's built-in rate limiter, or a Redis-backed token bucket).
+- **Status:** Implemented as a bounded per-user in-memory window in `JwtAuthFilter`; Redis-backed limiting remains
+  the production-scale upgrade.
 - **Why:** protects against abuse and accidental retry storms before they reach any business service.
 - **Where:** `apiGateway` — new filter or route-level config.
 
 ### Circuit breakers on Feign calls
-- **What:** wrap `AssignmentClient`, `ComplaintClient`, `NotificationClient` with Resilience4j `@CircuitBreaker`/`@Retry`.
+- **Status:** Resilience4j circuit-breaker dependencies, configuration, and Feign fallbacks are implemented for the
+  synchronous calls. Durable retry/outbox reconciliation remains future work.
 - **Why:** currently, if Assignment Service is down, Complaint Service's `createComplaint()` call blocks/throws with no graceful fallback — a slow or dead downstream service can cascade.
 - **Where:** `complaintService`/`assignmentService`'s `client/` packages, plus a `resilience4j.circuitbreaker.*` block in each `application.properties`.
 
@@ -80,12 +85,13 @@ Everything below is **not yet built**. This is the backlog, ordered by dependenc
 ## Phase — platform & operations
 
 ### Dockerization
-- **What:** a `Dockerfile` per service (multi-stage Maven build → slim JRE runtime) plus a root `docker-compose.yml` wiring all six services, Postgres, and (once added) Kafka.
+- **Status:** Implemented with a multi-stage Dockerfile per service and root Compose file wiring PostgreSQL, all services, and two Complaint Service instances.
 - **Why:** required before any real deployment target; also makes onboarding a new developer trivial (`docker-compose up` instead of manually starting six services in order).
 - **Where:** new `Dockerfile` in each service root, new `docker-compose.yml` at the repo root.
 
-### CI/CD pipeline
-- **What:** GitHub Actions workflow — build → test → (once Dockerized) build images → push → deploy.
+- **CI/CD pipeline**
+- **Status:** `.github/workflows/build.yml` runs Maven tests, packaging, Compose validation, and Docker image builds
+  on pushes and pull requests. Registry push/deployment is intentionally not configured without deployment secrets.
 - **Why:** catches breakage automatically instead of relying on manual `mvn clean install` runs.
 - **Where:** `.github/workflows/build.yml` at the repo root.
 

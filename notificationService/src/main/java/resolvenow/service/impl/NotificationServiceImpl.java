@@ -31,9 +31,13 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public void markRead(Long notificationId) {
+    public void markRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + notificationId));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Notification not found: " + notificationId));
+        if (!notification.getUserId().equals(userId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Notification belongs to another user");
+        }
         notification.setRead(true);
         notificationRepository.save(notification);
     }

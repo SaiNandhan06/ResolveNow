@@ -6,6 +6,8 @@ import resolvenow.client.AssignmentClient;
 import resolvenow.client.AssignmentClient.AssignmentTriggerRequest;
 import resolvenow.client.EscalationClient;
 import resolvenow.client.EscalationClient.EscalateRequest;
+import resolvenow.client.NotificationClient;
+import resolvenow.client.NotificationClient.NotificationCreateRequest;
 import resolvenow.dto.ComplaintRequest;
 import resolvenow.dto.ComplaintResponse;
 import resolvenow.model.Complaint;
@@ -23,6 +25,7 @@ public class ComplaintServiceImpl implements ComplaintService {
     private final ComplaintRepository complaintRepository;
     private final AssignmentClient assignmentClient;
     private final EscalationClient escalationClient;
+    private final NotificationClient notificationClient;
 
     // Category → priority mapping (auto-inferred, not customer-chosen)
     private static final Map<String, String> CATEGORY_PRIORITY = Map.of(
@@ -70,6 +73,16 @@ public class ComplaintServiceImpl implements ComplaintService {
     }
 
     @Override
+    public ComplaintResponse getComplaintForUser(Long complaintId, Long userId) {
+        Complaint complaint = findOrThrow(complaintId);
+        if (!complaint.getUserId().equals(userId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Complaint does not belong to user");
+        }
+        return toResponse(complaint);
+    }
+
+    @Override
     public List<ComplaintResponse> getMyComplaints(Long userId) {
         return complaintRepository.findByUserId(userId)
                 .stream()
@@ -80,9 +93,32 @@ public class ComplaintServiceImpl implements ComplaintService {
     @Override
     public ComplaintResponse updateStatus(Long complaintId, String status) {
         Complaint complaint = findOrThrow(complaintId);
+        if (!isValidTransition(complaint.getStatus(), status)) {
+            throw new IllegalArgumentException(
+                    "Invalid complaint status transition: " + complaint.getStatus() + " -> " + status);
+        }
         complaint.setStatus(status);
         complaint.setUpdatedAt(LocalDateTime.now());
         return toResponse(complaintRepository.save(complaint));
+    }
+
+    @Override
+    public ComplaintResponse close(Long complaintId, Long requestedByUserId) {
+        Complaint complaint = findOrThrow(complaintId);
+        if (!complaint.getUserId().equals(requestedByUserId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Complaint does not belong to user");
+        }
+        if (!"RESOLVED".equals(complaint.getStatus())) {
+            throw new IllegalArgumentException("Only resolved complaints can be closed");
+        }
+        complaint.setStatus("CLOSED");
+        complaint.setClosedAt(LocalDateTime.now());
+        complaint.setUpdatedAt(LocalDateTime.now());
+        ComplaintResponse response = toResponse(complaintRepository.save(complaint));
+        notificationClient.create(new NotificationCreateRequest(
+                complaint.getUserId(), complaintId, "Your complaint has been closed."));
+        return response;
     }
 
     @Override
@@ -114,7 +150,14 @@ public class ComplaintServiceImpl implements ComplaintService {
 
     private Complaint findOrThrow(Long id) {
         return complaintRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Complaint not found: " + id));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Complaint not found: " + id));
+    }
+
+    private boolean isValidTransition(String current, String next) {
+        return ("OPEN".equals(current) && "ASSIGNED".equals(next))
+                || ("ESCALATED".equals(current) && "ASSIGNED".equals(next))
+                || ("ASSIGNED".equals(current) && "IN_PROGRESS".equals(next))
+                || ("IN_PROGRESS".equals(current) && "RESOLVED".equals(next));
     }
 
     private ComplaintResponse toResponse(Complaint c) {
@@ -130,6 +173,10 @@ public class ComplaintServiceImpl implements ComplaintService {
                 .slaDueAt(c.getSlaDueAt())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
+                .resolutionNotes(c.getResolutionNotes())
+                .resolvedBy(c.getResolvedBy())
+                .resolvedAt(c.getResolvedAt())
+                .closedAt(c.getClosedAt())
                 .build();
     }
 }

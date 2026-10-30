@@ -11,4 +11,6 @@ public interface ComplaintService {
     ComplaintResponse updateStatus(Long complaintId, String status);
     List<ComplaintResponse> getMyComplaints(Long userId);
     ComplaintResponse escalate(Long complaintId, Long requestedByUserId);
+    ComplaintResponse close(Long complaintId, Long requestedByUserId);
+    ComplaintResponse getComplaintForUser(Long complaintId, Long userId);
 }

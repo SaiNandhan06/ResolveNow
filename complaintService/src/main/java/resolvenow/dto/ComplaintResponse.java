@@ -18,4 +18,8 @@ public class ComplaintResponse {
     private LocalDateTime slaDueAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String resolutionNotes;
+    private Long resolvedBy;
+    private LocalDateTime resolvedAt;
+    private LocalDateTime closedAt;
 }

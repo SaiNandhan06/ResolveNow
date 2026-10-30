@@ -1,0 +1,27 @@
+package resolvenow.config;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
+@RestControllerAdvice
+public class ApiExceptionHandler {
+    @ExceptionHandler(NoSuchElementException.class)
+    ResponseEntity<?> notFound(NoSuchElementException ex) { return response(HttpStatus.NOT_FOUND, ex.getMessage()); }
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<?> badRequest(IllegalArgumentException ex) { return response(HttpStatus.BAD_REQUEST, ex.getMessage()); }
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<?> status(ResponseStatusException ex) { return response(HttpStatus.valueOf(ex.getStatusCode().value()), ex.getReason()); }
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<?> unexpected(Exception ex) { return response(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error"); }
+    private ResponseEntity<?> response(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(Map.of("timestamp", Instant.now(), "status", status.value(),
+                "error", status.getReasonPhrase(), "message", message == null ? status.getReasonPhrase() : message));
+    }
+}
