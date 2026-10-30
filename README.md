@@ -75,6 +75,7 @@ docker compose up --build
 - [FEATURES_ROADMAP.md](docs/FEATURES_ROADMAP.md) - future enhancements
 - [PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) - conventions and continuation notes
 - [ResolveNowTesting.md](docs/ResolveNowTesting.md) - API walkthrough
+- [MANUAL_TESTING_GUIDE.md](docs/MANUAL_TESTING_GUIDE.md) - clone, Eclipse, Docker, environment, and complete manual test procedure
 
 ## Testing
 
