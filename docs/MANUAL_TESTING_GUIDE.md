@@ -163,12 +163,44 @@ Authorization: Bearer <accessToken>
 Content-Type: application/json
 ```
 
-The Gateway extracts the user identity from the JWT. Do not manually add `X-User-Id` or
-`X-User-Role`; those are trusted headers injected by the Gateway.
+> ⚠️ **Important Format Rules for Postman:**
+> - **Always use double quotes (`"`)** for JSON property names and string values. Single quotes (`'`) will trigger an `HttpMessageNotReadableException` (`500` or `400` error).
+> - Ensure exactly one space between `Bearer` and the token: `Bearer eyJhbGci...`.
+> - Do **not** manually include `X-User-Id` or `X-User-Role` headers; the API Gateway verifies the JWT and automatically injects these trusted headers downstream.
 
-## 7. Manual endpoint test sequence
+---
 
-### 7.1 Register a customer
+## 7. API Endpoints Master Cheat Sheet
+
+| Service | HTTP Method | Endpoint | Allowed Role | Header(s) | Description |
+|---|:---:|---|:---:|---|---|
+| **Auth** | `POST` | `/api/auth/register` | Public | None | Register new customer (`CUSTOMER` role) |
+| **Auth** | `POST` | `/api/auth/login` | Public | None | Login, receive JWT `accessToken` & `userId` |
+| **Auth** | `GET` | `/api/auth/internal/agents` | Internal | `X-Internal-Token` | List enabled agents per department (used by Assignment) |
+| **Complaints** | `POST` | `/api/complaints` | `CUSTOMER` | `Bearer {{customerToken}}` | Create complaint (auto-assigned via Feign) |
+| **Complaints** | `GET` | `/api/complaints/{id}` | Any Authenticated | `Bearer {{token}}` | Get complaint by ID (Customer can only view own) |
+| **Complaints** | `GET` | `/api/complaints/my` | `CUSTOMER` | `Bearer {{customerToken}}` | List all complaints raised by logged-in customer |
+| **Complaints** | `PUT` | `/api/complaints/{id}/escalate` | `CUSTOMER` | `Bearer {{customerToken}}` | Customer escalates an unresolved complaint |
+| **Complaints** | `POST` | `/api/complaints/{id}/close` | `CUSTOMER` | `Bearer {{customerToken}}` | Customer closes a `RESOLVED` complaint |
+| **Complaints** | `PUT` | `/api/complaints/{id}/status` | Internal | `X-Internal-Token` | Update status (`ASSIGNED`, `IN_PROGRESS`, etc.) |
+| **Assignments**| `GET` | `/api/assignments/my` | `AGENT` | `Bearer {{agentToken}}` | View agent's active ticket queue (`ASSIGNED` / `IN_PROGRESS`) |
+| **Assignments**| `GET` | `/api/assignments/my/history` | `AGENT` | `Bearer {{agentToken}}` | View agent's resolved / escalated history |
+| **Assignments**| `GET` | `/api/assignments/{complaintId}` | Any Authenticated | `Bearer {{token}}` | View assignment details for a complaint |
+| **Assignments**| `PUT` | `/api/assignments/{id}/accept` | `AGENT` | `Bearer {{agentToken}}` | Agent accepts ticket (`ASSIGNED` → `IN_PROGRESS`) |
+| **Assignments**| `PUT` | `/api/assignments/{id}/resolve` | `AGENT` | `Bearer {{agentToken}}` | Agent marks ticket resolved (`IN_PROGRESS` → `RESOLVED`) |
+| **Assignments**| `POST`| `/api/assignments` | Internal | `X-Internal-Token` | Auto-assign complaint to department agent |
+| **Assignments**| `POST`| `/api/assignments/{id}/escalate`| Internal | `X-Internal-Token` | Re-assign escalated ticket to different agent |
+| **Notifications**| `GET`| `/api/notifications/my` | Any Authenticated | `Bearer {{token}}` | List in-app notifications for authenticated user |
+| **Notifications**| `GET`| `/api/notifications/user/{userId}`| User / Internal | `Bearer {{token}}` | List notifications by user ID |
+| **Notifications**| `PUT`| `/api/notifications/{id}/read` | Any Authenticated | `Bearer {{token}}` | Mark single notification as read |
+| **Notifications**| `PUT`| `/api/notifications/my/read-all`| Any Authenticated | `Bearer {{token}}` | Mark all notifications as read for current user |
+| **Notifications**| `POST`| `/api/notifications` | Internal | `X-Internal-Token` | Create notification event row |
+
+---
+
+## 8. Manual Endpoint Test Sequence
+
+### 8.1 Register a Customer
 
 ```http
 POST {{baseUrl}}/api/auth/register
@@ -181,10 +213,12 @@ Content-Type: application/json
 }
 ```
 
-Expected: `200 OK`. Save `accessToken` as `customerToken` and save `userId`.
-Public registration must create a `CUSTOMER`, even if a caller tries to submit an operational role.
+- **Expected:** `200 OK`.
+- **Action:** Save `accessToken` as `customerToken` and note `userId`. Public registration strictly assigns the `CUSTOMER` role.
 
-### 7.2 Log in
+---
+
+### 8.2 Log In as Customer
 
 ```http
 POST {{baseUrl}}/api/auth/login
@@ -196,21 +230,24 @@ Content-Type: application/json
 }
 ```
 
-Expected response fields:
-
+- **Expected:** `200 OK`.
+- **Response Shape:**
 ```json
 {
-  "accessToken": "<jwt>",
-  "refreshToken": "<token>",
+  "accessToken": "eyJhbGciOiJIUzM4NCJ9...",
+  "refreshToken": "e305e917-062e-4cf0-8b02-6b944208a5c3",
   "role": "CUSTOMER",
-  "userId": 1,
+  "userId": 23,
   "department": null
 }
 ```
 
-The exact numeric `userId` can differ between database runs.
+---
 
-### 7.3 Create and read a complaint
+### 8.3 Create a Complaint
+
+Valid categories: `BILLING`, `TECHNICAL`, `HR`, `LOGISTICS`.
+Priority is automatically inferred (`HIGH` for BILLING/TECHNICAL, `MEDIUM` for HR, `LOW` for LOGISTICS).
 
 ```http
 POST {{baseUrl}}/api/complaints
@@ -224,25 +261,48 @@ Content-Type: application/json
 }
 ```
 
-Expected: `200 OK`. Save the returned complaint `id` as `complaintId`. The immediate response can show
-`OPEN`; the later GET should normally show `ASSIGNED` after automatic Feign assignment completes.
+- **Expected:** `200 OK`.
+- **Response:**
+```json
+{
+  "complaintId": 5,
+  "userId": 23,
+  "title": "Manual billing issue",
+  "description": "The invoice amount is incorrect",
+  "category": "BILLING",
+  "priority": "HIGH",
+  "status": "OPEN",
+  "escalationCount": 0,
+  "slaDueAt": "2026-10-31T03:33:46"
+}
+```
+- **Action:** Save the returned `complaintId`. Behind the scenes, `complaintService` synchronously calls `assignmentService` via Feign.
+
+---
+
+### 8.4 Check Complaint Status & Customer Queue
 
 ```http
 GET {{baseUrl}}/api/complaints/{{complaintId}}
 Authorization: Bearer {{customerToken}}
 ```
 
+- **Expected:** `200 OK`. Notice `"status": "ASSIGNED"`! The status automatically progressed from `OPEN` to `ASSIGNED` via Feign.
+
 ```http
 GET {{baseUrl}}/api/complaints/my
 Authorization: Bearer {{customerToken}}
 ```
 
-Expected: only this customer's complaints are returned.
+- **Expected:** `200 OK` returning an array of complaints belonging strictly to this customer.
 
-### 7.4 Log in as a seeded agent
+> 🔒 **RBAC Check:** If you call `/api/complaints/my` with an `AGENT` token, it will return **`403 Forbidden: Role is not allowed`** because agents do not submit customer complaints.
 
-The Auth Service seeds two agents per department. The default local password is `password`.
-For the BILLING complaint, use:
+---
+
+### 8.5 Log In as a Support Agent
+
+Seed users include agents across all departments: `agent-billing-1`, `agent-technical-1`, `agent-hr-1`, `agent-logistics-1`. Default password: `password`.
 
 ```http
 POST {{baseUrl}}/api/auth/login
@@ -254,93 +314,154 @@ Content-Type: application/json
 }
 ```
 
-Expected role: `AGENT`; expected department: `BILLING`. Save the returned access token as `agentToken`.
-Other seeded departments are `technical`, `hr`, `logistics`, and `general`.
+- **Expected:** `200 OK`.
+- **Response Shape:**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzM4NCJ9...",
+  "role": "AGENT",
+  "department": "BILLING",
+  "userId": 3
+}
+```
+- **Action:** Copy `accessToken` as `agentToken`.
 
-### 7.5 Check assignment and complete the lifecycle
+---
+
+### 8.6 Agent Checks Queue and Accepts Ticket
 
 ```http
 GET {{baseUrl}}/api/assignments/my
 Authorization: Bearer {{agentToken}}
 ```
 
-Find the assignment for `complaintId` and save its `id` as `assignmentId`.
+- **Expected:** `200 OK`. Shows tickets assigned to this agent:
+```json
+[
+  {
+    "assignmentId": 5,
+    "complaintId": 5,
+    "customerId": 23,
+    "department": "BILLING",
+    "assignedTo": 3,
+    "status": "ASSIGNED"
+  }
+]
+```
+- **Action:** Save `assignmentId`.
+
+Now the agent begins work:
 
 ```http
 PUT {{baseUrl}}/api/assignments/{{assignmentId}}/accept
 Authorization: Bearer {{agentToken}}
 ```
 
-Expected: `200 OK`; complaint becomes `IN_PROGRESS`.
+- **Expected:** `200 OK`. Complaint status changes to **`IN_PROGRESS`**.
+
+---
+
+### 8.7 Agent Resolves Ticket
 
 ```http
 PUT {{baseUrl}}/api/assignments/{{assignmentId}}/resolve
 Authorization: Bearer {{agentToken}}
 ```
 
-Expected: `200 OK`; complaint becomes `RESOLVED`.
+- **Expected:** `200 OK`. Complaint status changes to **`RESOLVED`**.
 
-Verify the state:
+Verify from customer's view:
 
 ```http
 GET {{baseUrl}}/api/complaints/{{complaintId}}
 Authorization: Bearer {{customerToken}}
 ```
 
-Expected lifecycle:
+- **Expected:** `status`: `"RESOLVED"`.
 
-```text
-OPEN -> ASSIGNED -> IN_PROGRESS -> RESOLVED
-```
+---
 
-### 7.6 Customer close and notifications
+### 8.8 Customer Closes Ticket
+
+Once a complaint is `RESOLVED`, the customer can officially close it:
 
 ```http
 POST {{baseUrl}}/api/complaints/{{complaintId}}/close
 Authorization: Bearer {{customerToken}}
 ```
 
-Expected: `200 OK`; complaint becomes `CLOSED`.
+- **Expected:** `200 OK`. Complaint status becomes **`CLOSED`**.
+- *(Note: A complaint cannot be closed until it reaches `RESOLVED` status)*.
 
-```http
-GET {{baseUrl}}/api/notifications/my
-Authorization: Bearer {{customerToken}}
-```
+---
 
-Expected: notifications for assignment, work started, resolution, or closure. Save one notification
-`id` as `notificationId`.
+### 8.9 Customer Escalation (Optional Flow)
 
-```http
-PUT {{baseUrl}}/api/notifications/{{notificationId}}/read
-Authorization: Bearer {{customerToken}}
-```
-
-```http
-PUT {{baseUrl}}/api/notifications/my/read-all
-Authorization: Bearer {{customerToken}}
-```
-
-Expected: `200 OK` for both read operations.
-
-## 8. Remaining public routes
-
-Run these after creating another complaint if the first complaint has already been closed:
-
-| Method | Route | Token/role | Expected purpose |
-|---|---|---|---|
-| `PUT` | `/api/complaints/{id}/escalate` | Customer | Manually escalates an owned complaint |
-| `GET` | `/api/assignments/{complaintId}` | Any authenticated role | Reads the assignment; customer is restricted to their own complaint |
-| `GET` | `/api/assignments/my/history` | Agent | Reads resolved/escalated assignment history |
-| `GET` | `/api/notifications/user/{userId}` | Same user only | Backward-compatible notification lookup |
-
-For escalation:
+If an open/assigned complaint is taking too long, the customer can manually escalate:
 
 ```http
 PUT {{baseUrl}}/api/complaints/{{complaintId}}/escalate
 Authorization: Bearer {{customerToken}}
 ```
 
-Expected: `200 OK` if the complaint is in a state that can be escalated, followed by reassignment.
+- **Expected:** `200 OK`. Status becomes `ESCALATED`, `escalationCount` increments, and `assignmentService` reassigns to an alternate agent.
+
+---
+
+### 8.10 In-App Notifications
+
+```http
+GET {{baseUrl}}/api/notifications/my
+Authorization: Bearer {{customerToken}}
+```
+
+- **Expected:** `200 OK` with full audit trail:
+```json
+[
+  {
+    "notificationId": 1,
+    "userId": 23,
+    "complaintId": 5,
+    "message": "Your complaint has been assigned to department BILLING",
+    "isRead": false
+  },
+  {
+    "notificationId": 2,
+    "userId": 23,
+    "complaintId": 5,
+    "message": "Agent has accepted your complaint and started working on it",
+    "isRead": false
+  },
+  {
+    "notificationId": 3,
+    "userId": 23,
+    "complaintId": 5,
+    "message": "Your complaint has been resolved by the agent",
+    "isRead": false
+  },
+  {
+    "notificationId": 4,
+    "userId": 23,
+    "complaintId": 5,
+    "message": "Your complaint has been closed.",
+    "isRead": false
+  }
+]
+```
+
+Mark a single notification read:
+
+```http
+PUT {{baseUrl}}/api/notifications/{{notificationId}}/read
+Authorization: Bearer {{customerToken}}
+```
+
+Mark all notifications read:
+
+```http
+PUT {{baseUrl}}/api/notifications/my/read-all
+Authorization: Bearer {{customerToken}}
+```
 
 ## 9. Internal endpoint inventory
 
